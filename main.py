@@ -180,3 +180,6 @@ if __name__ == "__main__":
     test_df = df.drop(train_df.index).sample(n=25, random_state=777)
     test_prompts = test_df['prompt'].tolist()
     run_benchmark(test_prompts, router)
+
+
+    

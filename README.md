@@ -1,3 +1,15 @@
+# 🌿 EcoPrompt: Intelligent Semantic Routing for Energy-Efficient LLM Inference
+
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Framework: Streamlit](https://img.shields.io/badge/Framework-Streamlit-red.svg)](https://streamlit.io/)
+
+EcoPrompt is an open-source, lightweight Machine Learning framework designed to reduce the operational expenditures (OpEx) and computational carbon footprint of Large Language Model (LLM) applications. 
+
+By analyzing the semantic and syntactic complexity of user prompts in sub-milliseconds, EcoPrompt dynamically orchestrates inference between small, eco-friendly models and large, high-reasoning models.
+
+---
+
 ## 📌 Problem Statement & Green AI
 The explosive growth of LLMs has led to massive energy consumption in global data centers. Standard AI architectures route all user inputs to state-of-the-art models (e.g., 70B+ parameter giants), even for trivial tasks (greeting, classification, basic Q&A). This approach wastes GPU compute, increases latency, and inflates cloud API costs.
 
@@ -36,6 +48,40 @@ The framework was evaluated on a subset of the `Databricks-dolly-15k` dataset.
 | **Routing Decision Latency** | N/A | < 1.0 ms | **Negligible Overhead** |
 | **Simple Task Cost (Avg)** | $0.0001395 | $0.0000147 | **🌿 90.2% Cost Savings** |
 | **End-to-End Latency** | 1.63s | 0.58s | **⚡ 64.4% Latency Reduction** |
+
+---
+
+## 🧩 How to Integrate into Your Own Project
+
+If you want to use the EcoPrompt router inside your own custom backend or chatbot, you can import the `EcoRouter` class directly:
+
+```python
+from main import EcoRouter
+import pandas as pd
+
+# 1. Initialize the router
+router = EcoRouter()
+
+# 2. Prepare your training dataset (DataFrame with 'prompt' and 'label' columns)
+dataset = pd.DataFrame({
+    "prompt": ["Hi", "What is 2+2?", "Write a compiler in C++ from scratch"],
+    "label": [0, 0, 1] # 0 = Simple (8B), 1 = Complex (70B)
+})
+
+# 3. Train the router
+router.train(dataset)
+
+# 4. Use the router to dynamically orchestrate inference in your app
+user_query = "Translate this document to Spanish"
+decision = router.predict(user_query)
+
+if decision == 1:
+    print("Routing to heavy model (Llama-70B)...")
+    # Call your heavy API here
+else:
+    print("Routing to light model (Llama-8B)...")
+    # Call your light API here
+```
 
 ---
 

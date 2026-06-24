@@ -94,7 +94,7 @@ else:
 ### Setup
 1. Clone the repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/EcoPrompt.git
+   git clone https://github.com/zengin0201/EcoPrompt.git
    cd EcoPrompt
    ```
 

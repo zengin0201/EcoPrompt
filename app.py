@@ -1,75 +1,99 @@
+import os
+import time
 import streamlit as st
-import pandas as pd
-from main import EcoRouter, call_heavy_model, call_light_model
-from datasets import load_dataset
+from dotenv import load_dotenv
+from groq import Groq
+from tenacity import retry, wait_random_exponential, stop_after_attempt
+from router import EcoRouter
 
-# Page Configuration
-st.set_page_config(page_title="EcoPrompt Router", page_icon="🌿", layout="centered")
+# Initialize environment and API client
+load_dotenv()
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+# Configure the UI layout
+st.set_page_config(page_title="EcoPrompt Research", page_icon="🌿", layout="centered")
 
 st.title("🌿 EcoPrompt Intelligent Router")
-st.write("This AI system automatically routes your prompt to the most efficient model, saving cost and energy.")
+st.markdown("""
+**An Energy-Efficient LLM Routing Framework.**  
+This system analyzes semantic complexity via `MiniLM Embeddings + Random Forest` in <1ms and dynamically routes queries to optimize compute, saving ~90% on API operational costs.
+""")
 
-# Cache the dataset and router training to prevent re-training on page reload
+# Load the pre-trained model once and cache it
 @st.cache_resource
-def get_trained_router():
-    dataset = load_dataset("databricks/databricks-dolly-15k", split="train")
-    df = dataset.to_pandas()
-    complex_tasks = ['brainstorming', 'generation', 'summarization', 'information_extraction']
-    df['prompt'] = df.apply(
-        lambda row: str(row['instruction']) + "\n" + str(row['context']) if pd.notna(row['context']) and row['context'] != "" else str(row['instruction']), 
-        axis=1
-    )
-    df['label'] = df['category'].apply(lambda x: 1 if x in complex_tasks else 0)
-    train_data = df.sample(n=1000, random_state=42)
-    
+def load_production_router():
     router = EcoRouter()
-    router.train(train_data)
-    return router
+    try:
+        router.load("router_model.pkl")
+        return router
+    except FileNotFoundError:
+        st.error("Model weights not found. Please run `python train_benchmark.py` in your terminal first.")
+        st.stop()
 
-with st.spinner("Initializing and training the EcoRouter model (takes 10-15s)..."):
-    router = get_trained_router()
-st.success("EcoRouter is online and ready!")
+router = load_production_router()
 
-# User input text area
-user_prompt = st.text_area("Enter your prompt for AI:", placeholder="Type something here...")
+# API call function with retry logic to handle rate limits
+@retry(wait=wait_random_exponential(min=1, max=5), stop=stop_after_attempt(3))
+def call_model(prompt, is_complex):
+    model_name = "llama-3.3-70b-versatile" if is_complex else "llama-3.1-8b-instant"
+    input_price = 0.59 if is_complex else 0.05
+    output_price = 0.79 if is_complex else 0.08
+    
+    start_time = time.time()
+    response = groq_client.chat.completions.create(
+        model=model_name,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1024
+    )
+    latency = time.time() - start_time
+    
+    p_tokens = response.usage.prompt_tokens
+    c_tokens = response.usage.completion_tokens
+    actual_cost = (p_tokens * (input_price / 1_000_000)) + (c_tokens * (output_price / 1_000_000))
+    
+    # Calculate what it would have cost if we routed everything to the heavy model
+    baseline_cost = (p_tokens * (0.59 / 1_000_000)) + (c_tokens * (0.79 / 1_000_000))
+    
+    return response.choices[0].message.content, latency, actual_cost, baseline_cost, model_name
 
-if st.button("Submit to AI"):
-    if user_prompt.strip() == "":
-        st.warning("Please enter a prompt first.")
+
+user_prompt = st.text_area("Enter your prompt:", placeholder="E.g., What is the capital of France? OR Write a Python script for a convolutional neural network...", height=150)
+
+if st.button("Submit to AI Framework"):
+    if not user_prompt.strip():
+        st.warning("Please enter a prompt to proceed.")
     else:
-        with st.spinner("Analyzing prompt complexity..."):
+        with st.spinner("Analyzing syntactic and semantic complexity..."):
             route_class = router.predict(user_prompt)
+            
+        st.divider()
         
-        st.write("---")
+        is_complex = (route_class == 1)
+        tier_label = "COMPLEX" if is_complex else "SIMPLE"
+        color = "red" if is_complex else "green"
         
-        # Routing execution logic
-        if route_class == 1:
-            st.info("🧠 **EcoRouter Decision:** This is a **COMPLEX** task. Routing to **Llama-3.3-70B**.")
-            with st.spinner("Waiting for Llama-3.3-70B..."):
-                response_text, latency, cost = call_heavy_model(user_prompt)
+        st.markdown(f"**🧠 EcoRouter Decision:** Detected as **:{color}[{tier_label} TASK]**")
+        
+        try:
+            with st.spinner("Streaming from optimal LLM..."):
+                resp_text, latency, actual_cost, baseline_cost, model_used = call_model(user_prompt, is_complex)
             
-            st.subheader("AI Response:")
-            st.write(response_text)
-            st.metric(label="Inference Cost (Dynamic)", value=f"${cost:.7f}", delta="Premium Processing", delta_color="inverse")
-        else:
-            st.success("⚡ **EcoRouter Decision:** This is a **SIMPLE** task. Routing to **Llama-3.1-8B**.")
-            with st.spinner("Waiting for Llama-3.1-8B..."):
-                response_text, latency, cost, heavy_equivalent_cost = call_light_model(user_prompt)
+            st.markdown(f"**Model selected:** `{model_used}`")
+            st.info(resp_text)
             
-            st.subheader("AI Response:")
-            st.write(response_text)
+            # Display metrics dashboard
+            st.subheader("📊 Inference Analytics")
+            col1, col2, col3 = st.columns(3)
             
-            # Calculate dynamic savings percentage
-            if heavy_equivalent_cost > 0:
-                savings = (1 - cost / heavy_equivalent_cost) * 100
+            col1.metric("Latency", f"{latency:.2f} s")
+            
+            if is_complex:
+                col2.metric("OpEx Cost", f"${actual_cost:.6f}", "Premium Tier", delta_color="inverse")
+                col3.metric("Cost Savings", "0%", "Required heavy compute")
             else:
-                savings = 0
+                savings_pct = (1 - actual_cost / baseline_cost) * 100
+                col2.metric("OpEx Cost", f"${actual_cost:.6f}", f"-${baseline_cost - actual_cost:.6f}")
+                col3.metric("Green Compute Savings", f"{savings_pct:.1f}%", "Eco-friendly routing")
                 
-            st.metric(
-                label="Inference Cost (Dynamic)", 
-                value=f"${cost:.7f}", 
-                delta=f"🌿 Saved {savings:.1f}% budget!", 
-                delta_color="normal"
-            )
-            
-        st.write(f"⏱️ **Response Time (Latency):** {latency:.2f} seconds")
+        except Exception as e:
+            st.error(f"API Error: Rate limit reached or connection failed. Details: {e}")

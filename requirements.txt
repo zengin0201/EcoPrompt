@@ -5,3 +5,8 @@ datasets
 groq
 python-dotenv
 streamlit
+sentence-transformers
+matplotlib
+seaborn
+tenacity
+joblib

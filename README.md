@@ -19,13 +19,13 @@ The explosive growth of LLMs has led to massive energy consumption in global dat
 
 ## ⚙️ System Architecture
 
-EcoPrompt evaluates prompt complexity using high-dimensional TF-IDF vectorization and a Random Forest Classifier trained on task-representative datasets.
+EcoPrompt evaluates prompt complexity using **all-MiniLM-L6-v2 semantic embeddings** and a balanced Random Forest Classifier trained on task-representative datasets.
 
 ```text
        [User Input Query]
                │
                ▼
-   [EcoPrompt Router (ML Engine)]  ◄── (Sub-millisecond inference)
+   [EcoPrompt Router (ML Engine)]  ◄── (Sub-millisecond inference via MiniLM)
                │
        ┌───────┴───────┐
 (Complexity = 0)  (Complexity = 1)
@@ -41,13 +41,14 @@ EcoPrompt evaluates prompt complexity using high-dimensional TF-IDF vectorizatio
 ---
 
 ## 📊 Empirical Results
-The framework was evaluated on a subset of the `Databricks-dolly-15k` dataset. 
+The framework was evaluated on the `Databricks-dolly-15k` dataset. 
 
 | Evaluation Metric | Baseline (100% Llama-70B) | EcoPrompt Framework | Net Improvement |
 | :--- | :--- | :--- | :--- |
 | **Routing Decision Latency** | N/A | < 1.0 ms | **Negligible Overhead** |
-| **Simple Task Cost (Avg)** | $0.0001395 | $0.0000147 | **🌿 90.2% Cost Savings** |
-| **End-to-End Latency** | 1.63s | 0.58s | **⚡ 64.4% Latency Reduction** |
+| **Simulated Cost (600 Queries)** | $0.1035 | $0.0392 | **🌿 62.1% Cost Optimization** |
+
+*(Note: The model is specifically balanced to ensure complex tasks are properly routed to the 70B parameter model, preserving high output accuracy while still achieving over 60% compute savings).*
 
 ---
 
@@ -56,23 +57,14 @@ The framework was evaluated on a subset of the `Databricks-dolly-15k` dataset.
 If you want to use the EcoPrompt router inside your own custom backend or chatbot, you can import the `EcoRouter` class directly:
 
 ```python
-from main import EcoRouter
-import pandas as pd
+from router import EcoRouter
 
-# 1. Initialize the router
+# 1. Initialize and load the pre-trained router
 router = EcoRouter()
+router.load("router_model.pkl")
 
-# 2. Prepare your training dataset (DataFrame with 'prompt' and 'label' columns)
-dataset = pd.DataFrame({
-    "prompt": ["Hi", "What is 2+2?", "Write a compiler in C++ from scratch"],
-    "label": [0, 0, 1] # 0 = Simple (8B), 1 = Complex (70B)
-})
-
-# 3. Train the router
-router.train(dataset)
-
-# 4. Use the router to dynamically orchestrate inference in your app
-user_query = "Translate this document to Spanish"
+# 2. Use the router to dynamically orchestrate inference in your app
+user_query = "Write a convolutional neural network in Python from scratch"
 decision = router.predict(user_query)
 
 if decision == 1:
@@ -108,9 +100,9 @@ else:
    GROQ_API_KEY=gsk_your_actual_api_key_here
    ```
 
-4. Run the command-line benchmark:
+4. Run the training script to generate the model weights (`router_model.pkl`) and academic plots:
    ```bash
-   python main.py
+   python train_benchmark.py
    ```
 
 5. Run the interactive Streamlit web application:
@@ -122,34 +114,26 @@ else:
 
 ## ☁️ Cloud Deployment (Streamlit Share)
 
-You can deploy this interactive dashboard to the web for free using Streamlit Cloud.
-
-### Step 1: Push Code to GitHub
-Ensure your repository is public and contains the following files:
-* `main.py`
+You can deploy this interactive dashboard to the web for free using Streamlit Cloud. Ensure your repository contains:
 * `app.py`
+* `router.py`
+* `router_model.pkl`
 * `requirements.txt`
-* *(Do NOT push your `.env` file to GitHub to protect your API key).*
+*(Do NOT push your `.env` file to GitHub).*
 
-### Step 2: Configure Streamlit Cloud
-1. Go to [share.streamlit.io](https://share.streamlit.io/) and log in with your GitHub account.
-2. Click **"New App"**, then select your `EcoPrompt` repository, branch, and set `app.py` as the main file path.
-3. Click **"Advanced Settings"** before deploying.
-4. In the **"Secrets"** text area, paste your Groq API key securely:
-   ```toml
-   GROQ_API_KEY = "gsk_your_actual_api_key_here"
-   ```
-5. Click **"Save"** and then **"Deploy"**. Your live application will be online in under 2 minutes!
+Set up your secrets in Streamlit Cloud Settings:
+```toml
+GROQ_API_KEY = "gsk_your_actual_api_key_here"
+```
 
 ---
 
 ## 🛠️ Tech Stack
-* **Language:** Python 3.11+
-* **Machine Learning:** Scikit-Learn (TF-IDF, Random Forest)
+* **Machine Learning:** Scikit-Learn (Random Forest), Sentence-Transformers (MiniLM)
 * **Data Handling:** Pandas, NumPy, HuggingFace Datasets
 * **Inference Platform:** Groq Cloud API SDK
 * **Frontend UI:** Streamlit Web Framework
 
 ## 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 ```

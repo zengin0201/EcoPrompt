@@ -1,4 +1,4 @@
-# 🌿 EcoPrompt: Intelligent Semantic Routing for Energy-Efficient LLM Inference
+# 🌿 EcoPrompt is an experimental Proof-of-Concept (PoC) and lightweight Machine Learning framework
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -51,6 +51,13 @@ The framework was evaluated on the `Databricks-dolly-15k` dataset.
 *(Note: The model is specifically balanced to ensure complex tasks are properly routed to the 70B parameter model, preserving high output accuracy while still achieving over 60% compute savings).*
 
 ---
+
+## ⚠️ Limitations & Future Work (Academic Context)
+As this is an experimental Proof-of-Concept developed as an independent high school research project, there are methodological limitations that I plan to address in future iterations:
+
+1. **Ground Truth Labeling Issue:** Currently, the training dataset maps `Databricks-dolly-15k` categories directly to complexity (e.g., *Information Extraction* = Simple, *Brainstorming* = Complex). In reality, complexity is highly nuanced and prompt-specific. Future versions will use an **LLM-as-a-judge** (e.g., GPT-4) to evaluate response quality between the 8B and 70B models to create an objective "complexity" ground truth, similar to frameworks like RouteLLM.
+2. **Missing Cost-Quality Tradeoff Metric:** The framework demonstrates a 62% reduction in simulated OpEx. However, it currently lacks a downstream accuracy metric (e.g., MT-Bench or human evaluation) to prove that this cost reduction does not significantly degrade the quality of the LLM responses. 
+3. **Baselines:** The current baseline compares the dynamic router only against a static 100% 70B routing architecture. Future evaluations must include heuristic baselines (e.g., routing based purely on prompt length) to justify the necessity of semantic embeddings.
 
 ## 🧩 How to Integrate into Your Own Project
 
